@@ -1,0 +1,49 @@
+name: OpenAPI CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - 'feat/**'
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  openapi-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Spectral Lint (Docker)
+        run: |
+          docker run --rm -v "${{ github.workspace }}":/src stoplight/spectral-cli lint /src/specs/example-service.yaml --fail-severity error
+
+      - name: Generate Artifacts (openapi-generator-cli)
+        run: |
+          mkdir -p generated
+          docker run --rm -v "${{ github.workspace }}":/local openapitools/openapi-generator-cli generate -i /local/specs/example-service.yaml -g typescript-axios -o /local/generated/client
+          docker run --rm -v "${{ github.workspace }}":/local openapitools/openapi-generator-cli generate -i /local/specs/example-service.yaml -g nodejs-express-server -o /local/generated/server
+      - name: Upload generated artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-generated
+          path: generated
+
+      - name: Contract test (Prism + Dredd)
+        run: |
+          # 啟動 Prism mock
+          docker run -d --rm --name prism-ci -p 4010:4010 -v "${{ github.workspace }}":/app stoplight/prism:4 mock /app/specs/example-service.yaml --hostname 0.0.0.0 --port 4010
+          # 等待 Prism
+          for i in $(seq 1 15); do
+            if docker run --rm --network host curlimages/curl:latest -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:4010/items" | grep -E '^2|^4' >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          # 執行 Dredd
+          docker run --rm --network host -v "${{ github.workspace }}":/tmp dredd/dredd dredd /tmp/specs/example-service.yaml http://127.0.0.1:4010
+          docker stop prism-ci || true

@@ -1,0 +1,167 @@
+openapi: 3.1.0
+info:
+  title: Example Item Service
+  description: 範例 CRUD 服務 — items（示範用）
+  version: "1.0.0"
+servers:
+  - url: http://localhost:4010
+    description: 本地 mock / 測試 server
+paths:
+  /items:
+    get:
+      summary: 列出 items（可分頁）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 第幾頁（1-based）
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: 每頁筆數
+      responses:
+        "200":
+          description: 成功，回傳 items 列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemListResponse'
+    post:
+      summary: 建立 item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreate'
+      responses:
+        "201":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+  /items/{itemId}:
+    parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: 取得單一 item
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        "404":
+          description: 找不到資源
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: 更新 item（全部欄位）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemUpdate'
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+    delete:
+      summary: 刪除 item
+      responses:
+        "204":
+          description: 刪除成功（無內容）
+components:
+  schemas:
+    Item:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          description: 物件 ID（UUID 或其他唯一值）
+        name:
+          type: string
+          description: 名稱
+        description:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+      example:
+        id: "a1b2c3d4"
+        name: "示例商品"
+        description: "這是一個範例 item"
+        price: 99.5
+        createdAt: "2025-01-01T00:00:00Z"
+    ItemCreate:
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+    ItemUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+    ItemListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      example:
+        code: "not_found"
+        message: "resource not found"
+tags:
+  - name: items
+    description: Item CRUD API
